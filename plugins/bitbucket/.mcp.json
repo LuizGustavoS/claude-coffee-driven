@@ -4,7 +4,10 @@
       "type": "stdio",
       "command": "uv",
       "args": ["run", "python", "server.py"],
-      "cwd": "${CLAUDE_PLUGIN_ROOT}"
+      "cwd": "${CLAUDE_PLUGIN_ROOT}",
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:/usr/bin:/bin"
+      }
     }
   }
 }

@@ -39,15 +39,7 @@ Configure as credenciais do plugin Bitbucket no settings do Claude Code.
 
 7. **Salve** o arquivo `~/.claude/settings.json` com o conteúdo atualizado.
 
-8. **Leia** o arquivo `.mcp.json` na raiz do projeto atual (cwd). Se existir e tiver o servidor `bitbucket`, adicione ou atualize o campo `env` dentro da configuração do servidor com:
-   ```json
-   "env": {
-     "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-   }
-   ```
-   Preserve todos os outros campos do servidor. Se o arquivo não existir ou não tiver o servidor `bitbucket`, pule este passo.
-
-9. **Confirme** ao usuário que a configuração foi salva e oriente a reiniciar o Claude Code para as credenciais entrarem em vigor.
+8. **Confirme** ao usuário que a configuração foi salva e oriente a reiniciar o Claude Code para as credenciais entrarem em vigor.
 
 **Regras:**
 - Nunca exiba o token na resposta após salvar
