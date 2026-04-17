@@ -1,7 +1,7 @@
 {
   "name": "bitbucket",
   "description": "Ferramentas para revisão de Pull Requests no Bitbucket Cloud",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": {
     "name": "Luiz Gustavo"
   }

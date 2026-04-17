@@ -18,6 +18,7 @@ Configure as credenciais do plugin Bitbucket no settings do Claude Code.
 
    | Escopo | Permissão | Necessário para |
    |--------|-----------|-----------------|
+   | Account | Read | Identificar o usuário autenticado |
    | Repositories | Read | Listar repositórios do workspace |
    | Pull requests | Read | Ler PR, diff, commits e comentários |
    | Pull requests | Write | Postar comentários e aprovar PRs |

@@ -31,6 +31,10 @@ plugins/<nome>/
 └── pyproject.toml        # Dependências Python (gerenciado com uv)
 ```
 
+## Versionamento de plugins
+
+Ao modificar qualquer arquivo de um plugin em `plugins/<nome>/`, incrementar obrigatoriamente a versão patch no `plugins/<nome>/.claude-plugin/plugin.json` antes de commitar. Exemplo: `1.0.1` → `1.0.2`. Isso é necessário para que o mecanismo de atualização do marketplace detecte a nova versão.
+
 ## Registro no marketplace
 
 O arquivo `/.claude-plugin/marketplace.json` é o índice central. Ao criar um novo plugin, registrá-lo aqui com `name`, `description` e `path`.

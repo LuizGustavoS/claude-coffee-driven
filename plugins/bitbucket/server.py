@@ -14,7 +14,15 @@ def _auth() -> tuple[str, str]:
 
 def _workspaces() -> list[str]:
     raw = os.environ["BITBUCKET_WORKSPACES"]
-    return json.loads(raw)
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else [parsed]
+    except json.JSONDecodeError:
+        return [w.strip() for w in raw.split(",") if w.strip()]
+
+
+def _current_account_id() -> str:
+    return _api("GET", "/user").json()["account_id"]
 
 
 def _api(method: str, path: str, **kwargs):
@@ -34,10 +42,13 @@ def get_pull_request(workspace: str, repo_slug: str, pr_id: int) -> str:
         pr_id: ID numérico do Pull Request
     """
     data = _api("GET", f"/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}").json()
+    reviewers = data.get("reviewers", [])
+    reviewers_str = ", ".join(r["display_name"] for r in reviewers) if reviewers else "(nenhum)"
     return (
         f"Título: {data['title']}\n"
         f"Descrição: {data.get('description') or '(sem descrição)'}\n"
         f"Autor: {data['author']['display_name']}\n"
+        f"Revisores: {reviewers_str}\n"
         f"Branch origem: {data['source']['branch']['name']}\n"
         f"Branch destino: {data['destination']['branch']['name']}\n"
         f"Estado: {data['state']}\n"
@@ -134,8 +145,8 @@ def list_my_pull_requests(workspace: str = "", state: str = "OPEN") -> str:
         state: Estado dos PRs — OPEN, MERGED, DECLINED ou ALL (padrão: OPEN)
     """
     workspaces = [workspace] if workspace else _workspaces()
-    username = os.environ["BITBUCKET_USERNAME"]
-    params: dict = {"pagelen": 50, "q": f'author.username="{username}"'}
+    account_id = _current_account_id()
+    params: dict = {"pagelen": 50, "q": f'author.account_id="{account_id}"'}
     if state != "ALL":
         params["q"] += f' AND state="{state}"'
 
@@ -174,8 +185,8 @@ def list_pull_requests_to_review(workspace: str = "", state: str = "OPEN") -> st
         state: Estado dos PRs — OPEN, MERGED, DECLINED ou ALL (padrão: OPEN)
     """
     workspaces = [workspace] if workspace else _workspaces()
-    username = os.environ["BITBUCKET_USERNAME"]
-    params: dict = {"pagelen": 50, "q": f'reviewers.username="{username}"'}
+    account_id = _current_account_id()
+    params: dict = {"pagelen": 50, "q": f'reviewers.account_id="{account_id}"'}
     if state != "ALL":
         params["q"] += f' AND state="{state}"'
 
