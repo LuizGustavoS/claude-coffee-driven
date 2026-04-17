@@ -4,15 +4,5 @@
   "version": "1.0.1",
   "author": {
     "name": "Luiz Gustavo"
-  },
-  "commands": [
-    {
-      "name": "setup",
-      "description": "Configura as credenciais do Bitbucket no Claude Code"
-    },
-    {
-      "name": "code_review",
-      "description": "Revisão de Pull Request no Bitbucket Cloud"
-    }
-  ]
+  }
 }
