@@ -11,7 +11,7 @@
       "description": "Configura as credenciais do Bitbucket no Claude Code"
     },
     {
-      "name": "code-review",
+      "name": "code_review",
       "description": "Revisão de Pull Request no Bitbucket Cloud"
     }
   ]
