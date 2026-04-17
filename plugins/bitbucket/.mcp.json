@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "bitbucket": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "python", "server.py"],
+      "cwd": "${CLAUDE_PLUGIN_ROOT}"
+    }
+  }
+}

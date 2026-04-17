@@ -11,7 +11,6 @@ Slash commands para o fluxo de desenvolvimento com Bitbucket. Não tem dependên
 | Comando | O que faz |
 |---|---|
 | `/gitflow:commit` | Analisa as mudanças, pergunta o número do ticket e gera um commit em Conventional Commits (pt-br) |
-| `/gitflow:code-review` | Guia uma revisão de pull request no Bitbucket |
 
 **Como usar:** abra o Claude Code em qualquer repositório git e chame o comando desejado. O Claude conduz o fluxo interativamente.
 
@@ -31,6 +30,33 @@ Servidor MCP para investigar logs no AWS CloudWatch Logs. O Claude acessa a AWS 
 | `search_logs` | Executa queries no CloudWatch Logs Insights (agregações, filtros complexos) |
 | `get_recent_logs` | Busca eventos recentes com filtro por padrão de texto |
 
+### bitbucket
+
+Servidor MCP para revisar Pull Requests no Bitbucket Cloud. O Claude busca o diff, commits e comentários do PR e conduz a revisão via `/bitbucket:code-review`.
+
+**Pré-requisitos:**
+- [uv](https://docs.astral.sh/uv/) instalado na máquina
+
+**Configuração:** chame `/bitbucket:setup` no Claude Code — o agente guia a criação do token e salva as credenciais automaticamente.
+
+Ou exporte manualmente as variáveis no ambiente (ex: `~/.zshrc`):
+
+```bash
+export BITBUCKET_USERNAME=seu-usuario
+export BITBUCKET_API_TOKEN=seu-api-token
+```
+
+**Como usar:** chame `/bitbucket:code-review` e informe a URL do PR. O Claude busca os dados, analisa o código e pergunta se deseja postar o resultado como comentário ou aprovar o PR.
+
+| Ferramenta MCP | Descrição |
+|---|---|
+| `get_pull_request` | Metadados do PR (título, autor, branches, estado) |
+| `get_pull_request_diff` | Diff completo das mudanças |
+| `get_pull_request_commits` | Lista de commits incluídos no PR |
+| `get_pull_request_comments` | Comentários existentes no PR |
+| `add_pull_request_comment` | Posta um comentário no PR |
+| `approve_pull_request` | Aprova o PR como o usuário autenticado |
+
 ## Como instalar
 
 Adicione o marketplace:
@@ -44,6 +70,7 @@ Instale os plugins desejados:
 ```bash
 claude plugin install gitflow@coffee-driven
 claude plugin install cloudwatch@coffee-driven
+claude plugin install bitbucket@coffee-driven
 ```
 
 ## Como atualizar
@@ -53,6 +80,7 @@ O Claude Code instala os plugins a partir de um commit específico do GitHub e o
 ```bash
 claude plugin update gitflow@coffee-driven
 claude plugin update cloudwatch@coffee-driven
+claude plugin update bitbucket@coffee-driven
 ```
 
 Ou para atualizar todos os plugins instalados de uma vez:

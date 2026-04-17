@@ -5,7 +5,8 @@
   },
   "enabledPlugins": {
     "gitflow@coffee-driven": true,
-    "cloudwatch@coffee-driven": true
+    "cloudwatch@coffee-driven": true,
+    "bitbucket@coffee-driven": true
   },
   "extraKnownMarketplaces": {
     "coffee-driven": {

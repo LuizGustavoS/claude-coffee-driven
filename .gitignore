@@ -1,4 +1,4 @@
 .DS_Store
-mcp/cloudwatch/.venv
-mcp/cloudwatch/__pycache__
+**/__pycache__
+**/.venv
 .idea/**

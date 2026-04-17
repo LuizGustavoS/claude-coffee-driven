@@ -17,6 +17,11 @@
       "name": "cloudwatch",
       "source": "./plugins/cloudwatch",
       "description": "Consulta de logs no AWS CloudWatch Logs via perfis AWS"
+    },
+    {
+      "name": "bitbucket",
+      "source": "./plugins/bitbucket",
+      "description": "Revisão de Pull Requests no Bitbucket Cloud"
     }
   ]
 }

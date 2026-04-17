@@ -1,0 +1,18 @@
+{
+  "name": "bitbucket",
+  "description": "Ferramentas para revisão de Pull Requests no Bitbucket Cloud",
+  "version": "1.0.0",
+  "author": {
+    "name": "Luiz Gustavo"
+  },
+  "commands": [
+    {
+      "name": "setup",
+      "description": "Configura as credenciais do Bitbucket no Claude Code"
+    },
+    {
+      "name": "code-review",
+      "description": "Revisão de Pull Request no Bitbucket Cloud"
+    }
+  ]
+}
