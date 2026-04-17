@@ -3,11 +3,7 @@
     "bitbucket": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "python", "server.py"],
-      "cwd": "${CLAUDE_PLUGIN_ROOT}",
-      "env": {
-        "PATH": "/opt/homebrew/bin:/usr/local/bin:${HOME}/.local/bin:/usr/bin:/bin"
-      }
+      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}", "python", "${CLAUDE_PLUGIN_ROOT}/server.py"]
     }
   }
 }
