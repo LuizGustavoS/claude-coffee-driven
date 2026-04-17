@@ -1,0 +1,18 @@
+{
+  "env": {
+    "CCGUI_CLI_LOGIN_AUTHORIZED": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "enabledPlugins": {
+    "gitflow@coffee-driven": true,
+    "cloudwatch@coffee-driven": true
+  },
+  "extraKnownMarketplaces": {
+    "coffee-driven": {
+      "source": {
+        "source": "github",
+        "repo": "LuizGustavoS/claude-coffee-driven"
+      }
+    }
+  }
+}

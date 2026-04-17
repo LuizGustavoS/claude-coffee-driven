@@ -1,0 +1,8 @@
+{
+  "name": "gitflow",
+  "description": "Slash commands para o fluxo de desenvolvimento no git no bitbucket",
+  "version": "1.0.0",
+  "author": {
+    "name": "Luiz Gustavo"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "coffee-driven",
+  "owner": {
+    "name": "Luiz Gustavo"
+  },
+  "metadata": {
+    "description": "Plugins para Claude Code",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "gitflow",
+      "source": "./plugins/gitflow",
+      "description": "Slash commands para o fluxo de desenvolvimento no bitbucket"
+    },
+    {
+      "name": "cloudwatch",
+      "source": "./plugins/cloudwatch",
+      "description": "Consulta de logs no AWS CloudWatch Logs via perfis AWS"
+    }
+  ]
+}

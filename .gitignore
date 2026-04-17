@@ -1,0 +1,4 @@
+.DS_Store
+mcp/cloudwatch/.venv
+mcp/cloudwatch/__pycache__
+.idea/**
