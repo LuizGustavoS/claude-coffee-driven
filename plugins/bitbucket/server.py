@@ -229,5 +229,19 @@ def approve_pull_request(workspace: str, repo_slug: str, pr_id: int) -> str:
     return f"PR aprovado por {data['user']['display_name']}"
 
 
+@mcp.tool()
+def request_changes_pull_request(workspace: str, repo_slug: str, pr_id: int) -> str:
+    """
+    Solicita mudanças em um Pull Request no Bitbucket Cloud como o usuário autenticado.
+
+    Args:
+        workspace: Slug do workspace no Bitbucket
+        repo_slug: Slug do repositório
+        pr_id: ID numérico do Pull Request
+    """
+    data = _api("POST", f"/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/request-changes").json()
+    return f"Mudanças solicitadas por {data['user']['display_name']}"
+
+
 if __name__ == "__main__":
     mcp.run()

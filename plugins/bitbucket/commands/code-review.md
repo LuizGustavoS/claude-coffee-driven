@@ -47,8 +47,10 @@ Faça uma revisão completa de um Pull Request seguindo este fluxo:
 9. **Pergunte ao usuário** se deseja:
    - Postar o resumo como comentário no PR via `add_pull_request_comment`
    - Marcar o PR como aprovado via `approve_pull_request`
+   - Solicitar mudanças via `request_changes_pull_request` (quando há problemas críticos)
 
 **Regras:**
 - Só aprove com `approve_pull_request` se o usuário confirmar explicitamente
+- Só solicite mudanças com `request_changes_pull_request` se o usuário confirmar explicitamente
 - Seja direto e objetivo — foco em problemas reais, não estilo pessoal
 - Se o diff for muito grande, priorize os arquivos de maior risco
