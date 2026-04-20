@@ -14,7 +14,7 @@ Faça uma revisão completa de um Pull Request seguindo este fluxo:
 
 4. Use `get_pull_request_commits` para listar os commits incluídos no PR.
 
-5. Use `get_pull_request_diff` para obter o diff completo das mudanças.
+5. Use `get_pull_request_diff` para obter o diff completo das mudanças. Se o resultado do diff contiver um redirecionamento (redirect) ou URL em vez do conteúdo, informe ao usuário que ele precisa acessar a pasta do projeto localmente para que o diff funcione corretamente, e então apresente um resumo parcial com base nos commits e metadados disponíveis (título, descrição, commits).
 
 6. Use `get_pull_request_comments` para ver o feedback já existente no PR.
 
