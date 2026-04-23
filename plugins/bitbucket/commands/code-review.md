@@ -25,6 +25,8 @@ Faça uma revisão completa de um Pull Request seguindo este fluxo:
    - Impacto em performance ou segurança
    - Consistência com o padrão do restante do código
 
+   Para cada observação (problema ou sugestão), **registre o local exato** onde ela se aplica: `path` (caminho do arquivo no repo) e `line` (número da linha no arquivo após a mudança, conforme o diff). Se o comentário se referir a uma linha removida, registre `line_side: "from"`; caso contrário use `"to"` (padrão).
+
 8. **Apresente o resultado** neste formato:
 
 ```
@@ -35,21 +37,24 @@ Faça uma revisão completa de um Pull Request seguindo este fluxo:
 ✅ Aprovado / ⚠️ Aprovado com ressalvas / ❌ Mudanças necessárias
 
 ## Problemas críticos
-- (itens que bloqueiam aprovação, ou "Nenhum")
+- `path/do/arquivo.py:42` — descrição do problema
+- (ou "Nenhum")
 
 ## Sugestões
-- (melhorias não bloqueantes)
+- `path/do/arquivo.py:87` — melhoria não bloqueante
 
 ## Perguntas
-- (dúvidas sobre a intenção do código)
+- `path/do/arquivo.py:12` — dúvida sobre a intenção do código
+- (perguntas sem linha associada podem ficar sem referência)
 ```
 
 9. **Pergunte ao usuário** se deseja:
-   - Postar o resumo como comentário no PR via `add_pull_request_comment`
+   - Postar os comentários no PR — **cada item de "Problemas críticos", "Sugestões" e "Perguntas" com linha associada deve ser postado como um comentário inline separado** via `add_pull_request_comment` (informando `path`, `line` e, quando aplicável, `line_side`). Apenas o "Resumo" (e eventuais perguntas gerais sem linha) vai como comentário geral, omitindo `path` e `line`.
    - Marcar o PR como aprovado via `approve_pull_request`
    - Solicitar mudanças via `request_changes_pull_request` (quando há problemas críticos)
 
 **Regras:**
+- Ao postar, faça um `add_pull_request_comment` por item — não concatene vários problemas num único bloco de texto
 - Só aprove com `approve_pull_request` se o usuário confirmar explicitamente
 - Só solicite mudanças com `request_changes_pull_request` se o usuário confirmar explicitamente
 - Seja direto e objetivo — foco em problemas reais, não estilo pessoal

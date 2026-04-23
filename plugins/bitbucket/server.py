@@ -116,22 +116,45 @@ def get_pull_request_comments(workspace: str, repo_slug: str, pr_id: int) -> str
 
 
 @mcp.tool()
-def add_pull_request_comment(workspace: str, repo_slug: str, pr_id: int, content: str) -> str:
+def add_pull_request_comment(
+    workspace: str,
+    repo_slug: str,
+    pr_id: int,
+    content: str,
+    path: str = "",
+    line: int = 0,
+    line_side: str = "to",
+) -> str:
     """
-    Adiciona um comentário geral em um Pull Request no Bitbucket Cloud.
+    Adiciona um comentário em um Pull Request no Bitbucket Cloud.
+    Se `path` e `line` forem informados, o comentário é inline (fixado na linha
+    do arquivo no diff). Caso contrário, é um comentário geral no PR.
 
     Args:
         workspace: Slug do workspace no Bitbucket
         repo_slug: Slug do repositório
         pr_id: ID numérico do Pull Request
         content: Texto do comentário (suporta Markdown)
+        path: Caminho do arquivo (relativo à raiz do repo) para comentário inline. Vazio = comentário geral.
+        line: Número da linha no diff para comentário inline. 0 = comentário geral.
+        line_side: "to" para linha na versão nova (padrão) ou "from" para linha na versão antiga (contexto removido)
     """
+    payload: dict = {"content": {"raw": content}}
+    if path and line:
+        inline: dict = {"path": path}
+        if line_side == "from":
+            inline["from"] = line
+        else:
+            inline["to"] = line
+        payload["inline"] = inline
+
     data = _api(
         "POST",
         f"/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments",
-        json={"content": {"raw": content}},
+        json=payload,
     ).json()
-    return f"Comentário adicionado (id: {data['id']})"
+    loc = f" em {path}:{line}" if path and line else ""
+    return f"Comentário adicionado{loc} (id: {data['id']})"
 
 
 @mcp.tool()
