@@ -1,14 +1,8 @@
 {
   "name": "cloudwatch",
   "description": "Consulta de logs no AWS CloudWatch Logs via perfis AWS",
-  "version": "1.1.0",
+  "version": "1.0.1",
   "author": {
     "name": "Luiz Gustavo"
-  },
-  "commands": [
-    {
-      "name": "logs",
-      "description": "Investiga logs no AWS CloudWatch Logs"
-    }
-  ]
+  }
 }
