@@ -38,12 +38,6 @@ O Claude Code mantém um cache local do marketplace e dos plugins. Para receber 
    claude plugin update figma@coffee-driven
    ```
 
-   Ou para atualizar todos os plugins instalados de uma vez:
-
-   ```bash
-   claude plugin update --all
-   ```
-
 ## Plugins disponíveis
 
 ### gitflow
