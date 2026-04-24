@@ -2,6 +2,48 @@
 
 Marketplace de plugins para o [Claude Code](https://claude.ai/code). Este repositório é a fonte do marketplace `coffee-driven` e contém plugins que estendem o Claude via slash commands e servidores MCP.
 
+## Como instalar
+
+Adicione o marketplace:
+
+```bash
+claude plugin marketplace add LuizGustavoS/claude-coffee-driven
+```
+
+Instale os plugins desejados:
+
+```bash
+claude plugin install gitflow@coffee-driven
+claude plugin install cloudwatch@coffee-driven
+claude plugin install bitbucket@coffee-driven
+claude plugin install figma@coffee-driven
+```
+
+## Como atualizar
+
+O Claude Code mantém um cache local do marketplace e dos plugins. Para receber mudanças publicadas neste repositório, primeiro atualize o índice do marketplace e depois os plugins.
+
+1. **Atualize o índice do marketplace** (necessário quando novos plugins foram adicionados ou os metadados mudaram):
+
+   ```bash
+   claude plugin marketplace update coffee-driven
+   ```
+
+2. **Atualize os plugins instalados:**
+
+   ```bash
+   claude plugin update gitflow@coffee-driven
+   claude plugin update cloudwatch@coffee-driven
+   claude plugin update bitbucket@coffee-driven
+   claude plugin update figma@coffee-driven
+   ```
+
+   Ou para atualizar todos os plugins instalados de uma vez:
+
+   ```bash
+   claude plugin update --all
+   ```
+
 ## Plugins disponíveis
 
 ### gitflow
@@ -81,40 +123,6 @@ export FIGMA_ACCESS_TOKEN=seu-personal-access-token
 | `list_components` | Componentes publicados no arquivo |
 | `list_styles` | Estilos publicados (cores, tipografia, efeitos, grades) |
 | `export_images` | Exporta frames/nodes como PNG, JPG, SVG ou PDF (retorna URLs S3 temporárias) |
-
-## Como instalar
-
-Adicione o marketplace:
-
-```bash
-claude plugin marketplace add LuizGustavoS/claude-coffee-driven
-```
-
-Instale os plugins desejados:
-
-```bash
-claude plugin install gitflow@coffee-driven
-claude plugin install cloudwatch@coffee-driven
-claude plugin install bitbucket@coffee-driven
-claude plugin install figma@coffee-driven
-```
-
-## Como atualizar
-
-O Claude Code instala os plugins a partir de um commit específico do GitHub e os armazena em cache local. Para receber mudanças publicadas neste repositório, rode:
-
-```bash
-claude plugin update gitflow@coffee-driven
-claude plugin update cloudwatch@coffee-driven
-claude plugin update bitbucket@coffee-driven
-claude plugin update figma@coffee-driven
-```
-
-Ou para atualizar todos os plugins instalados de uma vez:
-
-```bash
-claude plugin update --all
-```
 
 ## Testar um servidor MCP localmente com o Inspector
 

@@ -17,6 +17,28 @@ def _api(method: str, path: str, **kwargs):
     return r
 
 
+def _rgba_to_hex(c: dict | None) -> str | None:
+    if c is None:
+        return None
+    r = round(c.get("r", 0) * 255)
+    g = round(c.get("g", 0) * 255)
+    b = round(c.get("b", 0) * 255)
+    a = c.get("a", 1.0)
+    if abs(a - 1.0) < 0.004:
+        return f"#{r:02X}{g:02X}{b:02X}"
+    alpha = round(a * 255)
+    return f"#{r:02X}{g:02X}{b:02X}{alpha:02X}"
+
+
+def _to_kebab(name: str) -> str:
+    return name.replace(" ", "-").lower()
+
+
+def _chunk(lst: list, size: int = 50):
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
+
+
 def _walk_frames(node: dict, depth: int, current: int = 0) -> list[str]:
     lines = []
     indent = "  " * current
@@ -227,6 +249,227 @@ def list_project_files(project_id: str) -> str:
         last_modified = f.get("last_modified", "?")
         lines.append(f"[{key}] {name}\n  Última modificação: {last_modified}")
     return "\n\n".join(lines)
+
+
+@mcp.tool()
+def extract_design_system(file_key: str, output_path: str = "") -> str:
+    """
+    Extrai o design system completo de um arquivo Figma (cores, tipografia, efeitos, grids, componentes)
+    e gera um markdown estruturado otimizado para consumo por LLMs.
+
+    Args:
+        file_key: Chave do arquivo Figma (obtida via `list_project_files` ou URL do arquivo).
+        output_path: Caminho absoluto para salvar o markdown em disco. Se vazio, retorna o markdown inline.
+    """
+    file_meta = _api("GET", f"/files/{file_key}", params={"depth": 1}).json()
+    file_name = file_meta.get("name", "?")
+    last_modified = file_meta.get("lastModified", "?")
+    pages = [p.get("name", "?") for p in file_meta.get("document", {}).get("children", []) or []]
+
+    styles = _api("GET", f"/files/{file_key}/styles").json().get("meta", {}).get("styles", [])
+    fill_styles = [s for s in styles if s["style_type"] == "FILL"]
+    text_styles = [s for s in styles if s["style_type"] == "TEXT"]
+    effect_styles = [s for s in styles if s["style_type"] == "EFFECT"]
+    grid_styles = [s for s in styles if s["style_type"] == "GRID"]
+
+    components = _api("GET", f"/files/{file_key}/components").json().get("meta", {}).get("components", [])
+
+    style_nodes: dict = {}
+    for batch in _chunk([s["node_id"] for s in styles]):
+        resp = _api("GET", f"/files/{file_key}/nodes", params={"ids": ",".join(batch)}).json()
+        style_nodes.update(resp.get("nodes", {}))
+
+    comp_nodes: dict = {}
+    for batch in _chunk([c["node_id"] for c in components]):
+        resp = _api("GET", f"/files/{file_key}/nodes", params={"ids": ",".join(batch)}).json()
+        comp_nodes.update(resp.get("nodes", {}))
+
+    colors = []
+    for s in fill_styles:
+        token = _to_kebab(s["name"])
+        desc = s.get("description", "") or "—"
+        node = style_nodes.get(s["node_id"])
+        hex_val = "(erro)"
+        if node:
+            fills = node.get("document", {}).get("fills", [])
+            if fills:
+                fill = fills[0]
+                ftype = fill.get("type", "")
+                if ftype == "SOLID":
+                    hex_val = _rgba_to_hex(fill.get("color")) or "—"
+                elif ftype.startswith("GRADIENT_"):
+                    hex_val = "(gradient)"
+                elif ftype == "IMAGE":
+                    hex_val = "(image)"
+                else:
+                    hex_val = f"({ftype.lower()})"
+            else:
+                hex_val = "(sem fill)"
+        colors.append({"token": token, "hex": hex_val, "desc": desc})
+
+    typographies = []
+    for s in text_styles:
+        token = _to_kebab(s["name"])
+        node = style_nodes.get(s["node_id"])
+        typo = {"token": token, "font": "—", "size": "—", "weight": "—", "line_height": "—", "letter_spacing": "—"}
+        if node:
+            st = node.get("document", {}).get("style", {})
+            if st:
+                typo["font"] = st.get("fontFamily", "—")
+                typo["size"] = st.get("fontSize", "—")
+                typo["weight"] = st.get("fontWeight", "—")
+                lh_unit = st.get("lineHeightUnit", "")
+                if lh_unit == "PIXELS":
+                    lh = st.get("lineHeightPx")
+                    typo["line_height"] = f"{round(lh, 1)}px" if lh is not None else "—"
+                elif lh_unit == "PERCENT":
+                    lh = st.get("lineHeightPercentFontSize") or st.get("lineHeightPercent")
+                    typo["line_height"] = f"{round(lh, 1)}%" if lh is not None else "—"
+                elif lh_unit == "AUTO":
+                    typo["line_height"] = "auto"
+                else:
+                    lh = st.get("lineHeightPx")
+                    typo["line_height"] = f"{round(lh, 1)}px" if lh is not None else "—"
+                typo["letter_spacing"] = st.get("letterSpacing", 0)
+        typographies.append(typo)
+
+    effects = []
+    type_map = {
+        "DROP_SHADOW": "drop-shadow",
+        "INNER_SHADOW": "inner-shadow",
+        "LAYER_BLUR": "layer-blur",
+        "BACKGROUND_BLUR": "background-blur",
+    }
+    for s in effect_styles:
+        token = _to_kebab(s["name"])
+        node = style_nodes.get(s["node_id"])
+        if not node:
+            effects.append({"token": token, "type": "(erro)", "specs": "—"})
+            continue
+        effs = node.get("document", {}).get("effects", [])
+        if not effs:
+            effects.append({"token": token, "type": "—", "specs": "—"})
+            continue
+        for eff in effs:
+            etype = eff.get("type", "UNKNOWN")
+            parts = []
+            if "offset" in eff:
+                parts.append(f"x={eff['offset'].get('x', 0)} y={eff['offset'].get('y', 0)}")
+            if "radius" in eff:
+                parts.append(f"blur={eff['radius']}")
+            if "spread" in eff:
+                parts.append(f"spread={eff['spread']}")
+            if "color" in eff:
+                c = eff["color"]
+                parts.append(
+                    f"rgba({round(c['r']*255)},{round(c['g']*255)},{round(c['b']*255)},{round(c['a'], 3)})"
+                )
+            effects.append({
+                "token": token,
+                "type": type_map.get(etype, etype.lower()),
+                "specs": " ".join(parts) if parts else "—",
+            })
+
+    comp_data = []
+    for c in components:
+        node = comp_nodes.get(c["node_id"])
+        size = "—"
+        variants: list[str] = []
+        props_list: list[str] = []
+        if node:
+            doc = node.get("document", {})
+            bbox = doc.get("absoluteBoundingBox") or {}
+            if bbox:
+                size = f"{round(bbox.get('width', 0))}x{round(bbox.get('height', 0))}"
+            for prop_name, prop_def in (doc.get("componentPropertyDefinitions") or {}).items():
+                ptype = prop_def.get("type", "")
+                default = prop_def.get("defaultValue", "")
+                values = prop_def.get("variantOptions", [])
+                if values:
+                    props_list.append(f"`{prop_name}`: {' | '.join(str(v) for v in values)} (default: {default})")
+                else:
+                    props_list.append(f"`{prop_name}`: {ptype} (default: {default})")
+            if doc.get("type") == "COMPONENT_SET":
+                variants = [child.get("name", "?") for child in doc.get("children", []) or []]
+        comp_data.append({
+            "name": c["name"],
+            "desc": c.get("description", "") or "—",
+            "size": size,
+            "variants": variants,
+            "props": props_list,
+        })
+
+    seen = set()
+    unique_comps = []
+    for c in comp_data:
+        if c["name"] not in seen:
+            seen.add(c["name"])
+            unique_comps.append(c)
+
+    md = [
+        f"# Design System — {file_name}",
+        "",
+        f"**Fonte:** Figma · file_key `{file_key}`",
+        f"**Última modificação:** {last_modified}",
+        f"**Páginas:** {', '.join(pages) if pages else '—'}",
+        "",
+        "## Cores",
+        "",
+        "| Token | Hex | Descrição |",
+        "|---|---|---|",
+    ]
+    for c in colors:
+        md.append(f"| `{c['token']}` | `{c['hex']}` | {c['desc']} |")
+    md += [
+        "",
+        "## Tipografia",
+        "",
+        "| Token | Font | Size | Weight | Line height | Letter spacing |",
+        "|---|---|---|---|---|---|",
+    ]
+    for t in typographies:
+        md.append(
+            f"| `{t['token']}` | {t['font']} | {t['size']} | {t['weight']} | {t['line_height']} | {t['letter_spacing']} |"
+        )
+    if effects:
+        md += ["", "## Efeitos", "", "| Token | Tipo | Specs |", "|---|---|---|"]
+        for e in effects:
+            md.append(f"| `{e['token']}` | {e['type']} | {e['specs']} |")
+    if grid_styles:
+        md += ["", "## Grids", "", "| Token | Descrição |", "|---|---|"]
+        for s in grid_styles:
+            md.append(f"| `{_to_kebab(s['name'])}` | {s.get('description', '') or '—'} |")
+    md += ["", "## Componentes", ""]
+    for c in unique_comps:
+        md += [
+            f"### {c['name']}",
+            "",
+            f"- **Descrição:** {c['desc']}",
+            f"- **Tamanho padrão:** {c['size']}",
+        ]
+        if c["variants"]:
+            vs = ", ".join(c["variants"][:20])
+            if len(c["variants"]) > 20:
+                vs += f" ... (+{len(c['variants']) - 20} variantes)"
+            md.append(f"- **Variantes:** {vs}")
+        if c["props"]:
+            md.append("- **Props:**")
+            for p in c["props"]:
+                md.append(f"  - {p}")
+        md += ["", "---", ""]
+
+    output = "\n".join(md)
+
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(output)
+        return (
+            f"Design system salvo em: {output_path}\n"
+            f"Arquivo: {file_name} ({file_key})\n"
+            f"Cores: {len(colors)} | Tipografias: {len(typographies)} | "
+            f"Efeitos: {len(effects)} | Componentes: {len(unique_comps)} | Grids: {len(grid_styles)}"
+        )
+    return output
 
 
 if __name__ == "__main__":
