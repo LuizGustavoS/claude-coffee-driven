@@ -1,7 +1,7 @@
 ---
 name: design-system
 description: Extrai o design system de um arquivo Figma (cores, tipografia, efeitos, componentes) e gera um arquivo markdown estruturado e otimizado para consumo por LLMs. Use quando o usuário quiser converter um arquivo Figma em documentação de design tokens ou catálogo de componentes para alimentar outras LLMs.
-tools: mcp__figma__extract_design_system, mcp__figma__list_projects, mcp__figma__list_project_files
+tools: mcp__plugin_figma_figma__extract_design_system, mcp__plugin_figma_figma__list_projects, mcp__plugin_figma_figma__list_project_files
 model: sonnet
 ---
 
