@@ -22,6 +22,11 @@
       "name": "bitbucket",
       "source": "./plugins/bitbucket",
       "description": "Revisão de Pull Requests no Bitbucket Cloud"
+    },
+    {
+      "name": "figma",
+      "source": "./plugins/figma",
+      "description": "Inspeção de arquivos do Figma via REST API"
     }
   ]
 }

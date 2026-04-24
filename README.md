@@ -57,6 +57,31 @@ export BITBUCKET_API_TOKEN=seu-api-token
 | `add_pull_request_comment` | Posta um comentário no PR |
 | `approve_pull_request` | Aprova o PR como o usuário autenticado |
 
+### figma
+
+Servidor MCP para inspecionar arquivos do Figma via REST API. O Claude lê a estrutura do arquivo, componentes e estilos, e exporta imagens de frames via `/figma:inspect`.
+
+**Pré-requisitos:**
+- [uv](https://docs.astral.sh/uv/) instalado na máquina
+
+**Configuração:** chame `/figma:setup` no Claude Code — o agente guia a geração do Personal Access Token e salva a credencial automaticamente.
+
+Ou exporte manualmente a variável no ambiente (ex: `~/.zshrc`):
+
+```bash
+export FIGMA_ACCESS_TOKEN=seu-personal-access-token
+```
+
+**Como usar:** chame `/figma:inspect` e informe a URL do arquivo Figma. O Claude lista páginas/frames e conduz a inspeção a partir daí.
+
+| Ferramenta MCP | Descrição |
+|---|---|
+| `get_file` | Estrutura do arquivo (páginas e frames) até a profundidade informada |
+| `get_file_nodes` | Detalhes de nodes específicos (tipo, posição, tamanho, filhos) |
+| `list_components` | Componentes publicados no arquivo |
+| `list_styles` | Estilos publicados (cores, tipografia, efeitos, grades) |
+| `export_images` | Exporta frames/nodes como PNG, JPG, SVG ou PDF (retorna URLs S3 temporárias) |
+
 ## Como instalar
 
 Adicione o marketplace:
@@ -71,6 +96,7 @@ Instale os plugins desejados:
 claude plugin install gitflow@coffee-driven
 claude plugin install cloudwatch@coffee-driven
 claude plugin install bitbucket@coffee-driven
+claude plugin install figma@coffee-driven
 ```
 
 ## Como atualizar
@@ -81,6 +107,7 @@ O Claude Code instala os plugins a partir de um commit específico do GitHub e o
 claude plugin update gitflow@coffee-driven
 claude plugin update cloudwatch@coffee-driven
 claude plugin update bitbucket@coffee-driven
+claude plugin update figma@coffee-driven
 ```
 
 Ou para atualizar todos os plugins instalados de uma vez:
@@ -88,3 +115,20 @@ Ou para atualizar todos os plugins instalados de uma vez:
 ```bash
 claude plugin update --all
 ```
+
+## Testar um servidor MCP localmente com o Inspector
+
+Para validar um servidor MCP deste repositório sem precisar publicar/atualizar via Claude Code, use o [MCP Inspector](https://github.com/modelcontextprotocol/inspector). Ele sobe o servidor como subprocesso e abre uma UI no navegador para invocar cada tool manualmente.
+
+No diretório do plugin, com as variáveis de ambiente necessárias no comando:
+
+```bash
+cd plugins/figma
+FIGMA_ACCESS_TOKEN=seu-token npx @modelcontextprotocol/inspector uv run --project . python server.py
+```
+
+Para outros plugins deste repo basta trocar o diretório e as variáveis (ex: `cd plugins/bitbucket` com `BITBUCKET_USERNAME` / `BITBUCKET_API_TOKEN` / `BITBUCKET_WORKSPACES`).
+
+O Inspector imprime a URL da UI no terminal (com token de sessão embutido). Na interface: clique **Connect** → aba **Tools** → **List Tools** → selecione uma tool, preencha os parâmetros e clique **Run Tool**.
+
+Requer [Node.js](https://nodejs.org/) 18+ para o `npx` (o Inspector é baixado na primeira execução).

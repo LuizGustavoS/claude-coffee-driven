@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "figma": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}", "python", "${CLAUDE_PLUGIN_ROOT}/server.py"]
+    }
+  }
+}
