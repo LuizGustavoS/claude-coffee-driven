@@ -1,10 +1,12 @@
 import os
+import time
 import httpx
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("figma")
 
 BASE_URL = "https://api.figma.com/v1"
+MAX_RETRIES = 5
 
 
 def _headers() -> dict:
@@ -12,7 +14,18 @@ def _headers() -> dict:
 
 
 def _api(method: str, path: str, **kwargs):
-    r = httpx.request(method, f"{BASE_URL}{path}", headers=_headers(), **kwargs)
+    for attempt in range(MAX_RETRIES):
+        r = httpx.request(method, f"{BASE_URL}{path}", headers=_headers(), **kwargs)
+        if r.status_code == 429 and attempt < MAX_RETRIES - 1:
+            retry_after = r.headers.get("Retry-After")
+            try:
+                wait = float(retry_after) if retry_after else 2 ** attempt
+            except ValueError:
+                wait = 2 ** attempt
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r
     r.raise_for_status()
     return r
 
@@ -276,12 +289,20 @@ def extract_design_system(file_key: str, output_path: str = "") -> str:
 
     style_nodes: dict = {}
     for batch in _chunk([s["node_id"] for s in styles]):
-        resp = _api("GET", f"/files/{file_key}/nodes", params={"ids": ",".join(batch)}).json()
+        resp = _api(
+            "GET",
+            f"/files/{file_key}/nodes",
+            params={"ids": ",".join(batch), "depth": 1},
+        ).json()
         style_nodes.update(resp.get("nodes", {}))
 
     comp_nodes: dict = {}
     for batch in _chunk([c["node_id"] for c in components]):
-        resp = _api("GET", f"/files/{file_key}/nodes", params={"ids": ",".join(batch)}).json()
+        resp = _api(
+            "GET",
+            f"/files/{file_key}/nodes",
+            params={"ids": ",".join(batch), "depth": 2},
+        ).json()
         comp_nodes.update(resp.get("nodes", {}))
 
     colors = []
