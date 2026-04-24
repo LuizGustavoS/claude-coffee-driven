@@ -11,6 +11,7 @@ mcp = FastMCP("figma")
 
 BASE_URL = "https://api.figma.com/v1"
 MAX_RETRIES = 5
+MAX_RETRY_WAIT = 60.0
 HTTP_TIMEOUT = 60.0
 BATCH_SIZE = 50
 
@@ -46,12 +47,24 @@ def _api(method: str, path: str, **kwargs):
         if r.status_code == 429 and attempt < MAX_RETRIES - 1:
             retry_after = r.headers.get("Retry-After")
             try:
-                wait = float(retry_after) if retry_after else 2 ** attempt
+                raw = float(retry_after) if retry_after else 2 ** attempt
             except ValueError:
-                wait = 2 ** attempt
-            logger.warning(f"429 rate limited, sleeping {wait}s")
+                raw = 2 ** attempt
+            wait = min(raw, MAX_RETRY_WAIT)
+            if raw > MAX_RETRY_WAIT:
+                logger.warning(
+                    f"429 rate limited, Retry-After={raw}s capado em {wait}s"
+                )
+            else:
+                logger.warning(f"429 rate limited, sleeping {wait}s")
             time.sleep(wait)
             continue
+        if r.status_code == 429:
+            logger.error(f"429 rate limited após {MAX_RETRIES} tentativas em {path}")
+            raise RuntimeError(
+                f"Figma rate limit (429) em {path} após {MAX_RETRIES} tentativas. "
+                f"Aguarde e re-invoque a fase para retomar de onde parou."
+            )
         logger.info(f"  -> status={r.status_code}")
         r.raise_for_status()
         return r
