@@ -1,5 +1,9 @@
+import json
+import logging
 import os
 import time
+from pathlib import Path
+
 import httpx
 from mcp.server.fastmcp import FastMCP
 
@@ -7,6 +11,22 @@ mcp = FastMCP("figma")
 
 BASE_URL = "https://api.figma.com/v1"
 MAX_RETRIES = 5
+HTTP_TIMEOUT = 60.0
+BATCH_SIZE = 50
+
+logger = logging.getLogger("figma-mcp")
+
+
+def _setup_logging(work_dir: Path) -> Path:
+    log_path = work_dir / "debug.log"
+    for h in list(logger.handlers):
+        logger.removeHandler(h)
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return log_path
 
 
 def _headers() -> dict:
@@ -15,15 +35,24 @@ def _headers() -> dict:
 
 def _api(method: str, path: str, **kwargs):
     for attempt in range(MAX_RETRIES):
-        r = httpx.request(method, f"{BASE_URL}{path}", headers=_headers(), **kwargs)
+        logger.info(f"{method} {path} attempt={attempt + 1}")
+        r = httpx.request(
+            method,
+            f"{BASE_URL}{path}",
+            headers=_headers(),
+            timeout=HTTP_TIMEOUT,
+            **kwargs,
+        )
         if r.status_code == 429 and attempt < MAX_RETRIES - 1:
             retry_after = r.headers.get("Retry-After")
             try:
                 wait = float(retry_after) if retry_after else 2 ** attempt
             except ValueError:
                 wait = 2 ** attempt
+            logger.warning(f"429 rate limited, sleeping {wait}s")
             time.sleep(wait)
             continue
+        logger.info(f"  -> status={r.status_code}")
         r.raise_for_status()
         return r
     r.raise_for_status()
@@ -47,7 +76,7 @@ def _to_kebab(name: str) -> str:
     return name.replace(" ", "-").lower()
 
 
-def _chunk(lst: list, size: int = 50):
+def _chunk(lst: list, size: int = BATCH_SIZE):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
@@ -63,6 +92,21 @@ def _walk_frames(node: dict, depth: int, current: int = 0) -> list[str]:
         for child in node.get("children", []) or []:
             lines.extend(_walk_frames(child, depth, current + 1))
     return lines
+
+
+def _load_state(work_dir: Path) -> dict:
+    state_path = work_dir / "state.json"
+    if not state_path.exists():
+        raise FileNotFoundError(
+            f"state.json não encontrado em {work_dir}. Rode extract_ds_init primeiro."
+        )
+    return json.loads(state_path.read_text(encoding="utf-8"))
+
+
+def _save_state(work_dir: Path, state: dict) -> None:
+    (work_dir / "state.json").write_text(
+        json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 @mcp.tool()
@@ -265,45 +309,215 @@ def list_project_files(project_id: str) -> str:
 
 
 @mcp.tool()
-def extract_design_system(file_key: str, output_path: str = "") -> str:
+def extract_ds_init(file_key: str, work_dir: str) -> str:
     """
-    Extrai o design system completo de um arquivo Figma (cores, tipografia, efeitos, grids, componentes)
-    e gera um markdown estruturado otimizado para consumo por LLMs.
+    Fase 1/4 da extração do design system. Baixa metadados do arquivo, lista de styles e
+    lista de components, e persiste em {work_dir}/state.json.
+
+    Cada fase é curta o suficiente para caber no timeout padrão do Claude Code. Logs detalhados
+    ficam em {work_dir}/debug.log. Próxima fase: extract_ds_styles.
 
     Args:
-        file_key: Chave do arquivo Figma (obtida via `list_project_files` ou URL do arquivo).
-        output_path: Caminho absoluto para salvar o markdown em disco. Se vazio, retorna o markdown inline.
+        file_key: Chave do arquivo Figma (da URL ou via list_project_files).
+        work_dir: Diretório onde o estado intermediário e o markdown final serão salvos.
+                  Criado se não existir.
     """
+    wd = Path(work_dir).expanduser().resolve()
+    wd.mkdir(parents=True, exist_ok=True)
+    log_path = _setup_logging(wd)
+    logger.info(f"=== PHASE INIT START file_key={file_key} ===")
+
     file_meta = _api("GET", f"/files/{file_key}", params={"depth": 1}).json()
     file_name = file_meta.get("name", "?")
     last_modified = file_meta.get("lastModified", "?")
     pages = [p.get("name", "?") for p in file_meta.get("document", {}).get("children", []) or []]
 
     styles = _api("GET", f"/files/{file_key}/styles").json().get("meta", {}).get("styles", [])
-    fill_styles = [s for s in styles if s["style_type"] == "FILL"]
-    text_styles = [s for s in styles if s["style_type"] == "TEXT"]
-    effect_styles = [s for s in styles if s["style_type"] == "EFFECT"]
-    grid_styles = [s for s in styles if s["style_type"] == "GRID"]
-
     components = _api("GET", f"/files/{file_key}/components").json().get("meta", {}).get("components", [])
 
-    style_nodes: dict = {}
-    for batch in _chunk([s["node_id"] for s in styles]):
+    state = {
+        "file_key": file_key,
+        "file_name": file_name,
+        "last_modified": last_modified,
+        "pages": pages,
+        "styles": styles,
+        "components": components,
+        "phases": {
+            "init": "done",
+            "styles": "pending",
+            "components": "pending",
+            "finalize": "pending",
+        },
+    }
+    _save_state(wd, state)
+
+    fill = sum(1 for s in styles if s["style_type"] == "FILL")
+    text = sum(1 for s in styles if s["style_type"] == "TEXT")
+    effect = sum(1 for s in styles if s["style_type"] == "EFFECT")
+    grid = sum(1 for s in styles if s["style_type"] == "GRID")
+
+    logger.info(
+        f"=== PHASE INIT DONE styles={len(styles)} "
+        f"(FILL={fill} TEXT={text} EFFECT={effect} GRID={grid}) "
+        f"components={len(components)} ==="
+    )
+
+    return (
+        f"Phase INIT concluída.\n"
+        f"work_dir: {wd}\n"
+        f"log: {log_path}\n"
+        f"Arquivo: {file_name} ({file_key})\n"
+        f"Styles: {len(styles)} (FILL={fill}, TEXT={text}, EFFECT={effect}, GRID={grid}) | "
+        f"Components: {len(components)}\n"
+        f"Próxima fase: extract_ds_styles(work_dir='{wd}')"
+    )
+
+
+@mcp.tool()
+def extract_ds_styles(work_dir: str) -> str:
+    """
+    Fase 2/4. Resolve os nodes de cada style (FILL/TEXT/EFFECT/GRID) em lotes e persiste
+    incrementalmente em {work_dir}/styles_nodes.json.
+
+    Suporta resume: se a fase foi interrompida, re-invocar continua do último lote salvo.
+    Próxima fase: extract_ds_components.
+
+    Args:
+        work_dir: Mesmo diretório passado para extract_ds_init.
+    """
+    wd = Path(work_dir).expanduser().resolve()
+    _setup_logging(wd)
+    state = _load_state(wd)
+    file_key = state["file_key"]
+    styles = state["styles"]
+
+    nodes_path = wd / "styles_nodes.json"
+    existing: dict = {}
+    if nodes_path.exists():
+        existing = json.loads(nodes_path.read_text(encoding="utf-8"))
+
+    pending_ids = [s["node_id"] for s in styles if s["node_id"] not in existing]
+    logger.info(
+        f"=== PHASE STYLES START total={len(styles)} "
+        f"resolved={len(existing)} pending={len(pending_ids)} ==="
+    )
+
+    batches = list(_chunk(pending_ids))
+    for i, batch in enumerate(batches, 1):
+        logger.info(f"styles batch {i}/{len(batches)} size={len(batch)}")
         resp = _api(
             "GET",
             f"/files/{file_key}/nodes",
             params={"ids": ",".join(batch), "depth": 1},
         ).json()
-        style_nodes.update(resp.get("nodes", {}))
+        existing.update(resp.get("nodes", {}))
+        nodes_path.write_text(
+            json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
-    comp_nodes: dict = {}
-    for batch in _chunk([c["node_id"] for c in components]):
+    state["phases"]["styles"] = "done"
+    _save_state(wd, state)
+    logger.info(f"=== PHASE STYLES DONE resolved={len(existing)} ===")
+
+    return (
+        f"Phase STYLES concluída.\n"
+        f"Nodes resolvidos: {len(existing)}/{len(styles)}\n"
+        f"styles_nodes.json: {nodes_path}\n"
+        f"Próxima fase: extract_ds_components(work_dir='{wd}')"
+    )
+
+
+@mcp.tool()
+def extract_ds_components(work_dir: str) -> str:
+    """
+    Fase 3/4. Resolve os nodes de cada componente em lotes e persiste incrementalmente
+    em {work_dir}/components_nodes.json.
+
+    Suporta resume. Próxima fase: extract_ds_finalize.
+
+    Args:
+        work_dir: Mesmo diretório passado para extract_ds_init.
+    """
+    wd = Path(work_dir).expanduser().resolve()
+    _setup_logging(wd)
+    state = _load_state(wd)
+    file_key = state["file_key"]
+    components = state["components"]
+
+    nodes_path = wd / "components_nodes.json"
+    existing: dict = {}
+    if nodes_path.exists():
+        existing = json.loads(nodes_path.read_text(encoding="utf-8"))
+
+    pending_ids = [c["node_id"] for c in components if c["node_id"] not in existing]
+    logger.info(
+        f"=== PHASE COMPONENTS START total={len(components)} "
+        f"resolved={len(existing)} pending={len(pending_ids)} ==="
+    )
+
+    batches = list(_chunk(pending_ids))
+    for i, batch in enumerate(batches, 1):
+        logger.info(f"components batch {i}/{len(batches)} size={len(batch)}")
         resp = _api(
             "GET",
             f"/files/{file_key}/nodes",
             params={"ids": ",".join(batch), "depth": 2},
         ).json()
-        comp_nodes.update(resp.get("nodes", {}))
+        existing.update(resp.get("nodes", {}))
+        nodes_path.write_text(
+            json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+    state["phases"]["components"] = "done"
+    _save_state(wd, state)
+    logger.info(f"=== PHASE COMPONENTS DONE resolved={len(existing)} ===")
+
+    return (
+        f"Phase COMPONENTS concluída.\n"
+        f"Nodes resolvidos: {len(existing)}/{len(components)}\n"
+        f"components_nodes.json: {nodes_path}\n"
+        f"Próxima fase: extract_ds_finalize(work_dir='{wd}')"
+    )
+
+
+@mcp.tool()
+def extract_ds_finalize(work_dir: str, output_path: str = "") -> str:
+    """
+    Fase 4/4. Monta o markdown final do design system a partir do state + styles_nodes +
+    components_nodes salvos pelas fases anteriores. Nenhuma chamada à API do Figma.
+
+    Args:
+        work_dir: Diretório com state.json, styles_nodes.json e components_nodes.json.
+        output_path: Caminho do .md final. Se vazio, usa {work_dir}/design-system.md.
+    """
+    wd = Path(work_dir).expanduser().resolve()
+    _setup_logging(wd)
+    state = _load_state(wd)
+
+    style_nodes_path = wd / "styles_nodes.json"
+    comp_nodes_path = wd / "components_nodes.json"
+    if not style_nodes_path.exists() or not comp_nodes_path.exists():
+        return (
+            f"Erro: fases styles/components ainda não executadas em {wd}. "
+            f"Rode extract_ds_styles e extract_ds_components antes."
+        )
+
+    style_nodes = json.loads(style_nodes_path.read_text(encoding="utf-8"))
+    comp_nodes = json.loads(comp_nodes_path.read_text(encoding="utf-8"))
+
+    logger.info("=== PHASE FINALIZE START ===")
+
+    file_key = state["file_key"]
+    file_name = state["file_name"]
+    last_modified = state["last_modified"]
+    pages = state["pages"]
+    styles = state["styles"]
+    components = state["components"]
+
+    fill_styles = [s for s in styles if s["style_type"] == "FILL"]
+    text_styles = [s for s in styles if s["style_type"] == "TEXT"]
+    effect_styles = [s for s in styles if s["style_type"] == "EFFECT"]
+    grid_styles = [s for s in styles if s["style_type"] == "GRID"]
 
     colors = []
     for s in fill_styles:
@@ -481,16 +695,20 @@ def extract_design_system(file_key: str, output_path: str = "") -> str:
 
     output = "\n".join(md)
 
-    if output_path:
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(output)
-        return (
-            f"Design system salvo em: {output_path}\n"
-            f"Arquivo: {file_name} ({file_key})\n"
-            f"Cores: {len(colors)} | Tipografias: {len(typographies)} | "
-            f"Efeitos: {len(effects)} | Componentes: {len(unique_comps)} | Grids: {len(grid_styles)}"
-        )
-    return output
+    out = Path(output_path).expanduser().resolve() if output_path else (wd / "design-system.md")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(output, encoding="utf-8")
+
+    state["phases"]["finalize"] = "done"
+    _save_state(wd, state)
+    logger.info(f"=== PHASE FINALIZE DONE output={out} ===")
+
+    return (
+        f"Design system salvo em: {out}\n"
+        f"Arquivo: {file_name} ({file_key})\n"
+        f"Cores: {len(colors)} | Tipografias: {len(typographies)} | "
+        f"Efeitos: {len(effects)} | Componentes: {len(unique_comps)} | Grids: {len(grid_styles)}"
+    )
 
 
 if __name__ == "__main__":
